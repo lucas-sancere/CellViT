@@ -1,0 +1,10 @@
+tissue_types:
+  "Skin": 0
+
+nuclei_types:
+  "Background": 0
+  "Granulocytes": 1
+  "Inflammatory": 2
+  "Plasma": 3
+  "Stromal": 4
+  "Tumor": 5

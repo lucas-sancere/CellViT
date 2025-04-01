@@ -20,7 +20,7 @@ def select_dataset(
 
     Args:
         dataset_name (str): Name of dataset to use.
-            Must be one of: [pannuke, lizzard]
+            Must be one of: [pannuke, lizzard, skycanucleus]
         split (str): Split to use.
             Must be one of: ["train", "val", "validation", "test"]
         dataset_config (dict): Dictionary with dataset configuration settings
@@ -67,6 +67,20 @@ def select_dataset(
             stardist=dataset_config.get("stardist", False),
             regression=dataset_config.get("regression_loss", False),
             # TODO: Stardist and regression loss
+        )
+    elif dataset_name.lower() == "skycanucleus":
+        if split == "train":
+            folds = dataset_config["train_folds"]
+        if split == "val" or split == "validation":
+            folds = dataset_config["val_folds"]
+        if split == "test":
+            folds = dataset_config["test_folds"]
+        dataset = PanNukeDataset(
+            dataset_path=dataset_config["dataset_path"],
+            folds=folds,
+            transforms=transforms,
+            stardist=dataset_config.get("stardist", False),
+            regression=dataset_config.get("regression_loss", False),
         )
     else:
         raise NotImplementedError(f"Unknown dataset: {dataset_name}")
