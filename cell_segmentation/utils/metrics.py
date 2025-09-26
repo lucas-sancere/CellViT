@@ -36,6 +36,7 @@
 from typing import List
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from sklearn.metrics import balanced_accuracy_score
 
 
 def get_fast_pq(true, pred, match_iou=0.5):
@@ -268,3 +269,61 @@ def cell_type_detection_scores(
         2 * (tp_dt + tn_dt) + w[0] * fp_dt + w[1] * fn_dt + w[2] * fp_d + w[3] * fn_d
     )
     return f1_type, prec_type, rec_type
+
+
+def compute_balanced_accuracy(y_true, y_pred) -> float:
+    """
+    Balanced Accuracy for binary (or multi-class) classification.
+    y_true, y_pred can be list/np.ndarray/torch tensors of class indices.
+    """
+    if hasattr(y_true, "detach"):
+        y_true = y_true.detach().cpu().numpy()
+    if hasattr(y_pred, "detach"):
+        y_pred = y_pred.detach().cpu().numpy()
+    y_true = np.asarray(y_true).astype(int)
+    y_pred = np.asarray(y_pred).astype(int)
+    return float(balanced_accuracy_score(y_true, y_pred))
+
+
+
+def iou_match_pairs(gt_map: np.ndarray, pred_map: np.ndarray, iou_thresh: float = 0.5):
+    """
+    Return greedy IoU matches between non-zero GT and Pred instance ids.
+    Matches are (gt_id, pred_id). One-to-one, IoU >= iou_thresh.
+    """
+    gt_ids = np.unique(gt_map); gt_ids = gt_ids[gt_ids != 0]
+    pr_ids = np.unique(pred_map); pr_ids = pr_ids[pr_ids != 0]
+    if gt_ids.size == 0 or pr_ids.size == 0:
+        return []
+
+    area_gt = {gid: int((gt_map == gid).sum()) for gid in gt_ids}
+    area_pr = {pid: int((pred_map == pid).sum()) for pid in pr_ids}
+
+    triples = []  # (gid, pid, iou)
+    for gid in gt_ids:
+        pr_in_gt = pred_map[gt_map == gid]
+        if pr_in_gt.size == 0:
+            continue
+        binc = np.bincount(pr_in_gt)
+        present = np.nonzero(binc)[0]
+        for pid in present:
+            if pid == 0:
+                continue
+            inter = int(binc[pid])
+            union = area_gt[gid] + area_pr[pid] - inter
+            if union <= 0:
+                continue
+            iou = inter / union
+            if iou >= iou_thresh:
+                triples.append((gid, pid, iou))
+
+    # greedy by IoU desc
+    triples.sort(key=lambda t: t[2], reverse=True)
+    used_gt, used_pr, matches = set(), set(), []
+    for gid, pid, _ in triples:
+        if gid in used_gt or pid in used_pr:
+            continue
+        used_gt.add(gid); used_pr.add(pid)
+        matches.append((gid, pid))
+    return matches
+

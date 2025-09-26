@@ -22,6 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Callable, Tuple, Union
 
+import numpy as np
 import albumentations as A
 import torch
 import torch.nn as nn
@@ -249,6 +250,17 @@ class ExperimentCellVitPanNuke(BaseExperiment):
             unfreeze_epoch=self.run_conf["training"]["unfreeze_epoch"],
             eval_every=self.run_conf["training"].get("eval_every", 1),
         )
+
+
+        # Print end-of-training summary
+        if np.isfinite(trainer.best_nuc_bal_acc) and trainer.best_nuc_bal_acc_epoch >= 0:
+            trainer.logger.info(
+                f"[SUMMARY] Best Nuclei Instance Balanced Accuracy: "
+                f"{trainer.best_nuc_bal_acc:.4f} (epoch {trainer.best_nuc_bal_acc_epoch})"
+            )
+        else:
+            trainer.logger.info("[SUMMARY] No matched nuclei instances found to compute Balanced Accuracy.")
+
 
         # Select best model if not provided by early stopping
         checkpoint_dir = Path(self.run_conf["logging"]["log_dir"]) / "checkpoints"
