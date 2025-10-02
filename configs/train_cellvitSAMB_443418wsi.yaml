@@ -26,8 +26,8 @@ data:
   dataset_path: /data/lsancere/Data_General/TrainingSets/GraphSet/baseline_dataset/4434-18/CellViT_binaryformat/                          # Path to dataset, compare ./docs/readmes/pannuke.md for further details [str]
   train_folds: [0,1]             # List of fold Numbers to use for training [list[int]]
 #  val_split: 0.05                # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
-  val_folds: 2                # List of fold Numbers to use for validation [list[int]]
-  test_folds:               # List of fold Numbers to use for final testing [list[int]]
+  val_folds: 2               # List of fold Numbers to use for validation [list[int]]
+  test_folds:                # List of fold Numbers to use for final testing [list[int]]
   num_nuclei_classes: 3      # Number of different nuclei classes (including background!, e.g. 5 nuclei classes + background = 6) [int]
   num_tissue_classes: 1
   input_shape: 256           # Input shape of data. [int] [Optional, defaults to 256]
@@ -36,7 +36,7 @@ data:
 model:
   backbone: SAM-B                                                                                    # Backbone Type: Options are: default, ViT256, SAM-B, SAM-L, SAM-H
   pretrained_encoder: /data/lsancere/Ada_Codes/CellViT/models/pretrained/sam_vit_b.pth               # Set path to a pretrained encoder [str]
-  #pretrained: None                                                                                  # Path to a pretrained model (.pt file) [str, default None]
+  # pretrained: None                                                                                  # Path to a pretrained model (.pt file) [str, default None]
   embed_dim: 768                                                                                     # Embedding dimension for ViT - typical values are 384 (ViT-S), 768 (ViT-B), 1024 (ViT-L), 1280 (ViT-H) [int]
   input_channels: 3                                                                                  # Number of input channels, usually 3 for RGB [int, default 3]
   depth: 12                                                                                          # Number of Transformer Blocks to use - typical values are 12 (ViT-S), 12 (ViT-B), 24 (ViT-L), 32 (ViT-H) [int]
@@ -72,7 +72,7 @@ loss:
       loss_fn: MCFocalTverskyLoss
       weight: 0.5
       args:
-        num_classes: 6
+        num_classes: 3
   tissue_types:
     ce:
       loss_fn: CrossEntropyLoss

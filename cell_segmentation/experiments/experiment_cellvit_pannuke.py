@@ -11,6 +11,7 @@ import inspect
 import os
 import shutil
 import sys
+import re
 
 import yaml
 
@@ -276,6 +277,112 @@ class ExperimentCellVitPanNuke(BaseExperiment):
 
         return self.run_conf["logging"]["log_dir"]
 
+
+
+
+    # ----------------------------
+    # Helper: load encoder weights safely (ignore heads/decoders if present)
+    # ----------------------------
+    def _load_encoder_weights_only(self, model: nn.Module, ckpt_path: Union[str, Path]) -> None:
+        """
+        Try model.load_pretrained_encoder(path) first.
+        If the checkpoint actually contains full-model weights, filter out
+        non-encoder keys (type heads, decoders, tissue heads, regression, etc.)
+        and load with strict=False.
+        """
+        try:
+            # Prefer model’s native loader (handles key remapping)
+            model.load_pretrained_encoder(str(ckpt_path))
+            self.logger.info(f"Loaded encoder via model.load_pretrained_encoder: {ckpt_path}")
+            return
+        except Exception as e:
+            self.logger.warning(f"model.load_pretrained_encoder failed ({e}). Falling back to filtered state_dict.")
+
+        blob = torch.load(ckpt_path, map_location="cpu")
+        state = blob["model"] if isinstance(blob, dict) and "model" in blob else blob
+        if not isinstance(state, dict):
+            self.logger.warning("Encoder checkpoint format not recognized; skipping fallback load.")
+            return
+
+        # Drop obvious non-encoder modules
+        drop_tokens = ("type_head", "nuclei_type", "decoder", "seg", "tissue", "regression", "out_head", "classifier")
+        filtered = {k: v for k, v in state.items() if not any(t in k.lower() for t in drop_tokens)}
+
+        # Try partial load (encoder/binary/hv/pos_embed/backbone blocks typically match)
+        msg = model.load_state_dict(filtered, strict=False)
+        self.logger.info(f"Loaded encoder weights with strict=False. load_state_dict msg: {msg}")
+
+
+
+
+
+    # ----------------------------
+    # Helper: checkpoint head surgery
+    # ----------------------------
+    def _prepare_state_dict_head_surgery(self, blob, expected_classes: int):
+        """
+        Accepts either a raw state_dict or a dict with 'model' key.
+        If expected_classes == 3, drops all params belonging to the nuclei type head
+        when their OUT channels do not match expected_classes. Returns (state_dict, removed_any).
+        """
+        # unwrap to a clean state_dict
+        if isinstance(blob, dict) and "model" in blob and isinstance(blob["model"], dict):
+            state_dict = blob["model"]
+            wrapped = True
+        else:
+            state_dict = blob
+            wrapped = False
+        if not isinstance(state_dict, dict):
+            self.logger.warning("Checkpoint format not recognized; loading as-is.")
+            return (blob, False)
+        # Only perform surgery when user explicitly targets 3 classes
+        if int(expected_classes) != 3:
+            return (blob, False)
+        # Any module path containing these tokens is considered the nuclei-type head
+        head_pat = re.compile(r"(type_head|nuclei_type)", re.IGNORECASE)
+        # Pass 1: detect heads whose out-features/out-channels mismatch 3
+        # We’ll collect module prefixes to drop (everything under them).
+        prefixes_to_drop = set()
+        for k, v in state_dict.items():
+            if not head_pat.search(k):
+                continue
+            if not torch.is_tensor(v):
+                continue
+            # Heuristic: for conv weights -> (out,in,kh,kw); linear -> (out,in); bias -> (out,)
+            if k.endswith(".weight") or k.endswith(".bias"):
+                out_dim = int(v.shape[0]) if v.ndim >= 1 else None
+                if out_dim is not None and out_dim != int(expected_classes):
+                    # derive module prefix (strip the param suffix)
+                    prefix = k.rsplit(".", 1)[0]  # e.g., "type_head.classifier"
+                    # drop whole top-level head (everything up to the first component that matches)
+                    # find the segment that actually contains 'type_head' or 'nuclei_type'
+                    parts = prefix.split(".")
+                    for i in range(len(parts)):
+                        if head_pat.search(parts[i]):
+                            prefixes_to_drop.add(".".join(parts[: i + 1]))
+                            break
+        if not prefixes_to_drop:
+            # no mismatch found: keep strict loading
+            return (blob, False)
+        # Pass 2: actually drop everything under those prefixes
+        dropped = []
+        new_sd = {}
+        for k, v in state_dict.items():
+            if any(k.startswith(pref + ".") or k == pref for pref in prefixes_to_drop):
+                dropped.append(k)
+                continue
+            new_sd[k] = v
+        self.logger.info(
+            f"Head surgery: removed {len(dropped)} params from nuclei type head(s) "
+            f"to match num_nuclei_classes={expected_classes}."
+        )
+        return ({"model": new_sd} if wrapped else new_sd, True)
+
+
+
+
+
+
     def load_dataset_setup(self, dataset_path: Union[Path, str]) -> None:
         """Load the configuration of the cell segmentation dataset.
 
@@ -385,6 +492,7 @@ class ExperimentCellVitPanNuke(BaseExperiment):
                 "mse": {"loss_fn": retrieve_loss_fn("mse_loss_maps"), "weight": 1},
                 "msge": {"loss_fn": retrieve_loss_fn("msge_loss_maps"), "weight": 1},
             }
+
         if "nuclei_type_map" in loss_fn_settings.keys():
             loss_fn_dict["nuclei_type_map"] = {}
             for loss_name, loss_sett in loss_fn_settings["nuclei_type_map"].items():
@@ -398,6 +506,42 @@ class ExperimentCellVitPanNuke(BaseExperiment):
                 "bce": {"loss_fn": retrieve_loss_fn("xentropy_loss"), "weight": 1},
                 "dice": {"loss_fn": retrieve_loss_fn("dice_loss"), "weight": 1},
             }
+
+
+
+
+
+        # ---- nuclei_type_map (multi-class nuclei types) ----
+        # if "nuclei_type_map" in loss_fn_settings.keys():
+        #     loss_fn_dict["nuclei_type_map"] = {}
+        #     for loss_name, loss_sett in loss_fn_settings["nuclei_type_map"].items():
+        #         parameters = dict(loss_sett.get("args", {}))
+        #         # Ensure cross-entropy-style losses know the class count
+        #         if "num_classes" not in parameters and any(
+        #             key in loss_sett["loss_fn"].lower()
+        #             for key in ["xentropy", "cross", "focal", "ce"]
+        #         ):
+        #             parameters["num_classes"] = int(self.run_conf["data"]["num_nuclei_classes"])
+        #         loss_fn_dict["nuclei_type_map"][loss_name] = {
+        #             "loss_fn": retrieve_loss_fn(loss_sett["loss_fn"], **parameters),
+        #             "weight": loss_sett["weight"],
+        #         }
+        # else:
+        #     # Defaults: explicitly set num_classes for CE-style loss
+        #     loss_fn_dict["nuclei_type_map"] = {
+        #         "ce": {
+        #             "loss_fn": retrieve_loss_fn(
+        #                 "xentropy_loss",
+        #                 num_classes=int(self.run_conf["data"]["num_nuclei_classes"])
+        #             ),
+        #             "weight": 1,
+        #         },
+        #         # Dice loss usually doesn't need num_classes; if your implementation does, add the same arg.
+        #         "dice": {"loss_fn": retrieve_loss_fn("dice_loss"), "weight": 1},
+        #     }
+
+
+
         if "tissue_types" in loss_fn_settings.keys():
             loss_fn_dict["tissue_types"] = {}
             for loss_name, loss_sett in loss_fn_settings["tissue_types"].items():
@@ -592,13 +736,29 @@ class ExperimentCellVitPanNuke(BaseExperiment):
                 regression_loss=regression_loss,
             )
 
+
+
+
+
             if pretrained_model is not None:
-                self.logger.info(
-                    f"Loading pretrained CellViT model from path: {pretrained_model}"
+                self.logger.info(f"Loading pretrained CellViT model from path: {pretrained_model}")
+                blob = torch.load(pretrained_model, map_location="cpu")
+                state_to_load, removed = self._prepare_state_dict_head_surgery(
+                    blob, self.run_conf["data"]["num_nuclei_classes"]
                 )
-                cellvit_pretrained = torch.load(pretrained_model)
-                self.logger.info(model.load_state_dict(cellvit_pretrained, strict=True))
+                strict_flag = not removed
+                msg = model.load_state_dict(
+                    state_to_load["model"] if isinstance(state_to_load, dict) and "model" in state_to_load else state_to_load,
+                    strict=strict_flag,
+                )
+                self.logger.info(f"load_state_dict(strict={strict_flag}): {msg}")
+                if removed:
+                    self.logger.info("Reinitialized nuclei type head for 3 classes.")
                 self.logger.info("Loaded CellViT model")
+
+
+
+
 
         if backbone_type.lower() == "vit256":
             if shared_decoders:
@@ -614,15 +774,39 @@ class ExperimentCellVitPanNuke(BaseExperiment):
                 drop_path_rate=self.run_conf["training"].get("drop_path_rate", 0),
                 regression_loss=regression_loss,
             )
-            model.load_pretrained_encoder(model.model256_path)
+
+
+            # Robust encoder loading
+            if pretrained_encoder is not None:
+                self.logger.info(f"Loading pretrained encoder from path: {pretrained_encoder}")
+                self._load_encoder_weights_only(model, pretrained_encoder)
+
             if pretrained_model is not None:
                 self.logger.info(
                     f"Loading pretrained CellViT model from path: {pretrained_model}"
                 )
-                cellvit_pretrained = torch.load(pretrained_model, map_location="cpu")
-                self.logger.info(model.load_state_dict(cellvit_pretrained, strict=True))
+
+
+
+                blob = torch.load(pretrained_model, map_location="cpu")
+                state_to_load, removed = self._prepare_state_dict_head_surgery(
+                    blob, self.run_conf["data"]["num_nuclei_classes"]
+                )
+                strict_flag = not removed
+                msg = model.load_state_dict(
+                    state_to_load["model"] if isinstance(state_to_load, dict) and "model" in state_to_load else state_to_load,
+                    strict=strict_flag,
+                )
+                self.logger.info(f"load_state_dict(strict={strict_flag}): {msg}")
+                if removed:
+                    self.logger.info("Reinitialized nuclei type head for 3 classes.")
+
+
             model.freeze_encoder()
             self.logger.info("Loaded CellVit256 model")
+       
+
+
         if backbone_type.lower() in ["sam-b", "sam-l", "sam-h"]:
             if shared_decoders:
                 model_class = CellViTSAMShared
@@ -636,13 +820,36 @@ class ExperimentCellVitPanNuke(BaseExperiment):
                 drop_rate=self.run_conf["training"].get("drop_rate", 0),
                 regression_loss=regression_loss,
             )
-            model.load_pretrained_encoder(model.model_path)
+
+
+            # Robust encoder loading
+            if pretrained_encoder is not None:
+                self.logger.info(f"Loading pretrained encoder from path: {pretrained_encoder}")
+                self._load_encoder_weights_only(model, pretrained_encoder)
+
             if pretrained_model is not None:
                 self.logger.info(
                     f"Loading pretrained CellViT model from path: {pretrained_model}"
                 )
-                cellvit_pretrained = torch.load(pretrained_model, map_location="cpu")
-                self.logger.info(model.load_state_dict(cellvit_pretrained, strict=True))
+
+
+
+                blob = torch.load(pretrained_model, map_location="cpu")
+                state_to_load, removed = self._prepare_state_dict_head_surgery(
+                    blob, self.run_conf["data"]["num_nuclei_classes"]
+                )
+                strict_flag = not removed
+                msg = model.load_state_dict(
+                    state_to_load["model"] if isinstance(state_to_load, dict) and "model" in state_to_load else state_to_load,
+                    strict=strict_flag,
+                )
+                self.logger.info(f"load_state_dict(strict={strict_flag}): {msg}")
+                if removed:
+                    self.logger.info("Reinitialized nuclei type head for 3 classes.")
+
+
+
+
             model.freeze_encoder()
             self.logger.info(f"Loaded CellViT-SAM model with backbone: {backbone_type}")
 
