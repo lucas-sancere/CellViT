@@ -31,11 +31,13 @@ from cell_segmentation.utils.metrics import (
     get_fast_pq,
     remap_label,
     compute_balanced_accuracy,
-    iou_match_pairs,  # <-- NEW: add this in metrics.py as shown earlier
+    iou_match_pairs,  
 )
 from cell_segmentation.utils.tools import cropping_center
 from models.segmentation.cell_segmentation.cellvit import CellViT
 from utils.tools import AverageMeter
+
+
 
 
 class CellViTTrainer(BaseTrainer):
@@ -122,6 +124,8 @@ class CellViTTrainer(BaseTrainer):
                     f"{branch}_{loss_name}", ":.4f"
                 )
         self.batch_avg_tissue_acc = AverageMeter("Batch_avg_tissue_ACC", ":4.f")
+
+
 
     def train_epoch(
         self, epoch: int, train_dataloader: DataLoader, unfreeze_epoch: int = 50

@@ -1,6 +1,6 @@
 
 logging:
-  mode: offline                         # "online" or "offline" [str]
+  mode: online                         # "online" or "offline" [str]
   project: celllVIT-4434-18              # Name of project to use [str]
   notes: CellViT-256                    # Notes about the run, verbose description [str]
   log_comment: CellViT-256-1            # Comment to add to name the local logging folder [str]
@@ -23,12 +23,12 @@ gpu: 1                      # Number of GPU to run experiment on [int]
 # setting paths and dataset
 data:
   dataset: 443418ws      # Name of dataset, currently supported: PanNuke, Conic. Select your dataset and the script will autoamtically select the corresponding experiment [str]
-  dataset_path: /data/lsancere/Data_General/TrainingSets/GraphSet/baseline_dataset/4434-18/CellViT_4434-18/                          # Path to dataset, compare ./docs/readmes/pannuke.md for further details [str]
+  dataset_path: /data/lsancere/Data_General/TrainingSets/GraphSet/baseline_dataset/4434-18/CellViT_binaryformat/     # Path to dataset, compare ./docs/readmes/pannuke.md for further details [str]
   train_folds: [0,1]             # List of fold Numbers to use for training [list[int]]
-  val_split: 0               # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
-  # val_folds:                 # List of fold Numbers to use for validation [list[int]]
-  test_folds: 2              # List of fold Numbers to use for final testing [list[int]]
-  num_nuclei_classes: 6      # Number of different nuclei classes (including background!, e.g. 5 nuclei classes + background = 6) [int]
+  # val_split: 0.05                # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
+  val_folds: 2               # List of fold Numbers to use for validation [list[int]]
+  test_folds:                # List of fold Numbers to use for final testing [list[int]]
+  num_nuclei_classes: 3      # Number of different nuclei classes (including background!, e.g. 5 nuclei classes + background = 6) [int]
   num_tissue_classes: 1
   input_shape: 256           # Input shape of data. [int] [Optional, defaults to 256]
 
@@ -36,7 +36,7 @@ data:
 model:
   backbone: ViT256                                                                                   # Backbone Type: Options are: default, ViT256, SAM-B, SAM-L, SAM-H
   pretrained_encoder: /data/lsancere/Ada_Codes/CellViT/models/pretrained/CellViT-256-x40.pth         # Set path to a pretrained encoder [str]
-  #pretrained: None                                                                                  # Path to a pretrained model (.pt file) [str, default None]
+  # pretrained: None                                                                                  # Path to a pretrained model (.pt file) [str, default None]
   embed_dim: 384                                                                                     # Embedding dimension for ViT - typical values are 384 (ViT-S), 768 (ViT-B), 1024 (ViT-L), 1280 (ViT-H) [int]
   input_channels: 3                                                                                  # Number of input channels, usually 3 for RGB [int, default 3]
   depth: 12                                                                                          # Number of Transformer Blocks to use - typical values are 12 (ViT-S), 12 (ViT-B), 24 (ViT-L), 32 (ViT-H) [int]
@@ -72,7 +72,7 @@ loss:
       loss_fn: MCFocalTverskyLoss
       weight: 0.5
       args:
-        num_classes: 6
+        num_classes: 3
   tissue_types:
     ce:
       loss_fn: CrossEntropyLoss
@@ -82,7 +82,7 @@ loss:
 # training options
 training:
   batch_size: 32            # Training Batch size [int]
-  epochs: 200               # Number of Training Epochs to use [int]
+  epochs: 100               # Number of Training Epochs to use [int]
   unfreeze_epoch: 25        # Epoch Number to unfreeze backbone [int]
   drop_rate: 0              # Dropout rate [float] [Optional, defaults to 0]
   attn_drop_rate: 0         # Dropout rate in attention layer [float] [Optional, defaults to 0]
@@ -149,4 +149,4 @@ eval_checkpoint: best_checkpoint.pth            # Either select "best_checkpoint
 
 dataset_config:
   tissue_types: 1
-  nuclei_types: 6
+  nuclei_types: 3

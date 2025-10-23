@@ -1,6 +1,6 @@
 
 logging:
-  mode: offline                          # "online" or "offline" [str]
+  mode: online                          # "online" or "offline" [str]
   project: celllVIT-4434-18              # Name of project to use [str]
   notes: CellViT-SAM-B                    # Notes about the run, verbose description [str]
   log_comment: CellViT-SAM-B-1             # Comment to add to name the local logging folder [str]
@@ -23,9 +23,9 @@ gpu: 1                      # Number of GPU to run experiment on [int]
 # setting paths and dataset
 data:
   dataset: 443418ws      # Name of dataset, currently supported: PanNuke, Conic. Select your dataset and the script will autoamtically select the corresponding experiment [str]
-  dataset_path: /data/lsancere/Data_General/TrainingSets/GraphSet/baseline_dataset/4434-18/CellViT_binaryformat/                          # Path to dataset, compare ./docs/readmes/pannuke.md for further details [str]
+  dataset_path: /data/lsancere/Data_General/TrainingSets/GraphSet/baseline_dataset/4434-18/CellViT_binaryformat/      # Path to dataset, compare ./docs/readmes/pannuke.md for further details [str]
   train_folds: [0,1]             # List of fold Numbers to use for training [list[int]]
-#  val_split: 0.05                # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
+  # val_split: 0.05                # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
   val_folds: 2               # List of fold Numbers to use for validation [list[int]]
   test_folds:                # List of fold Numbers to use for final testing [list[int]]
   num_nuclei_classes: 3      # Number of different nuclei classes (including background!, e.g. 5 nuclei classes + background = 6) [int]
@@ -81,13 +81,13 @@ loss:
 
 # training options
 training:
-  batch_size: 32            # Training Batch size [int]
-  epochs: 100               # Number of Training Epochs to use [int]
-  unfreeze_epoch: 25        # Epoch Number to unfreeze backbone [int]
-  drop_rate: 0              # Dropout rate [float] [Optional, defaults to 0]
-  attn_drop_rate: 0         # Dropout rate in attention layer [float] [Optional, defaults to 0]
-  drop_path_rate: 0         # Dropout rate in paths [float] [Optional, defaults to 0]
-  optimizer: AdamW          # Pytorch Optimizer Name. All pytorch optimizers (v1.13) are supported. [str]
+  batch_size: 32              # Training Batch size [int]
+  epochs: 100                 # Number of Training Epochs to use [int]
+  unfreeze_epoch: 25          # Epoch Number to unfreeze backbone [int]
+  drop_rate: 0                # Dropout rate [float] [Optional, defaults to 0]
+  attn_drop_rate: 0           # Dropout rate in attention layer [float] [Optional, defaults to 0]
+  drop_path_rate: 0           # Dropout rate in paths [float] [Optional, defaults to 0]
+  optimizer: AdamW            # Pytorch Optimizer Name. All pytorch optimizers (v1.13) are supported. [str]
   
   optimizer_hyperparameter:   # Hyperparamaters for the optimizers, must be named exactly as in the pytorch documation given for the selected optimizer
     lr: 0.001                 # e.g. learning-rate for Adam
@@ -104,6 +104,8 @@ training:
   sampling_gamma: 0.85                  # Gamma for balancing sampling. Must be between 0 (equal weights) and 1 (100% oversampling) [float] [Optional, defaults to 1]
   mixed_precision: False                # Mixed precision Flag. [bool] [Optional, default False]
   eval_every: 1                         # Number of training epochs between every validation. If 1, alternating training and validation as commonly used. [int] [Optional, default 1]
+
+
 
 
 # transformations, here all options are given. Remove transformations by removing them from this section
@@ -149,4 +151,4 @@ eval_checkpoint: best_checkpoint.pth            # Either select "best_checkpoint
 
 dataset_config:
   tissue_types: 1
-  nuclei_types: 6
+  nuclei_types: 3
