@@ -82,6 +82,20 @@ def select_dataset(
             stardist=dataset_config.get("stardist", False),
             regression=dataset_config.get("regression_loss", False),
         )
+    elif dataset_name.lower() == "443418ws":
+        if split == "train":
+            folds = dataset_config["train_folds"]
+        if split == "val" or split == "validation":
+            folds = dataset_config["val_folds"]
+        if split == "test":
+            folds = dataset_config["test_folds"]
+        dataset = PanNukeDataset(
+            dataset_path=dataset_config["dataset_path"],
+            folds=folds,
+            transforms=transforms,
+            stardist=dataset_config.get("stardist", False),
+            regression=dataset_config.get("regression_loss", False),
+        )
     else:
         raise NotImplementedError(f"Unknown dataset: {dataset_name}")
     return dataset

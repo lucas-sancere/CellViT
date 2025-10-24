@@ -1,10 +1,10 @@
 
 logging:
-  mode: online                          # "online" or "offline" [str]
+  mode: online                           # "online" or "offline" [str]
   project: celllVIT-4434-18              # Name of project to use [str]
-  notes: CellViT-SAM-B                    # Notes about the run, verbose description [str]
-  log_comment: CellViT-SAM-B-1             # Comment to add to name the local logging folder [str]
-  tags:                                 # List of tags, e.g., ["baseline", "run1"] [str]
+  notes: CellViT-SAM-B                   # Notes about the run, verbose description [str]
+  log_comment: CellViT-SAM-B-1           # Comment to add to name the local logging folder [str]
+  tags:                                  # List of tags, e.g., ["baseline", "run1"] [str]
     - train
     # - "tag2"
     # - "..."
@@ -147,7 +147,7 @@ transformations:
     - 0.5
     - 0.5                  
 
-eval_checkpoint: best_checkpoint.pth            # Either select "best_checkpoint.pth", "latest_checkpoint.pth" or one of the intermediate checkpoint names, e.g., "checkpoint_100.pth"
+eval_checkpoint: latest_checkpoint.pth            # Either select "model_best.pth" , "best_checkpoint.pth" (not sure this one works), "latest_checkpoint.pth" or one of the intermediate checkpoint names, e.g., "checkpoint_100.pth"
 
 dataset_config:
   tissue_types: 1
