@@ -2,8 +2,8 @@
 logging:
   mode: online                          # "online" or "offline" [str]
   project: celllVIT-4434-18             # Name of project to use [str]
-  notes: CellViT-256                    # Notes about the run, verbose description [str]
-  log_comment: CellViT-256-1            # Comment to add to name the local logging folder [str]
+  notes: CellViT-256-xval-[0,1]-2                    # Notes about the run, verbose description [str]
+  log_comment: CellViT-256-xval-[0,1]-2               # Comment to add to name the local logging folder [str]
   tags:                                 # List of tags, e.g., ["baseline", "run1"] [str]
     - train
     # - "tag2"
@@ -27,7 +27,7 @@ data:
   train_folds: [0,1]             # List of fold Numbers to use for training [list[int]]
   # val_split: 0.05                # Percentage of training set that should be used for validation. Either val_split or val_fold must be provided, not both. [float]
   val_folds: 2               # List of fold Numbers to use for validation [list[int]]
-  test_folds:                # List of fold Numbers to use for final testing [list[int]]
+  test_folds:             # List of fold Numbers to use for final testing [list[int]]
   num_nuclei_classes: 3      # Number of different nuclei classes (including background!, e.g. 5 nuclei classes + background = 6) [int]
   num_tissue_classes: 1
   input_shape: 256           # Input shape of data. [int] [Optional, defaults to 256]
@@ -82,7 +82,7 @@ loss:
 # training options
 training:
   batch_size: 32            # Training Batch size [int]
-  epochs: 100               # Number of Training Epochs to use [int]
+  epochs: 200               # Number of Training Epochs to use [int]
   unfreeze_epoch: 25        # Epoch Number to unfreeze backbone [int]
   drop_rate: 0              # Dropout rate [float] [Optional, defaults to 0]
   attn_drop_rate: 0         # Dropout rate in attention layer [float] [Optional, defaults to 0]

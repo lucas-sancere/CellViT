@@ -358,9 +358,9 @@ class CellViTTrainer(BaseTrainer):
             y_true=np.concatenate(tissue_gt), y_pred=np.concatenate(tissue_pred)
         )
 
-        nuc_bal_acc_inst = None
+        nuc_bal_acc_type = None
         if len(nuc_type_gt_inst_all) > 0:
-            nuc_bal_acc_inst = compute_balanced_accuracy(
+            nuc_bal_acc_type = compute_balanced_accuracy(
                 y_true=np.concatenate(nuc_type_gt_inst_all),
                 y_pred=np.concatenate(nuc_type_pred_inst_all),
             )
@@ -378,13 +378,13 @@ class CellViTTrainer(BaseTrainer):
             "Nuclei-GT-Instances/Validation": gt_inst_total,
         }
 
-        if nuc_bal_acc_inst is not None:
-            scalar_metrics["Nuclei-Instance-Balanced-Accuracy/Validation"] = nuc_bal_acc_inst
+        if nuc_bal_acc_type is not None:
+            scalar_metrics["Nuclei-Type-Balanced-Accuracy/Validation"] = nuc_bal_acc_type 
             # --- W&B logging (epoch-level) ---
             try:
                 if wandb.run is not None:
                     wandb.log({
-                        "val/nuclei_instance_balanced_accuracy": float(nuc_bal_acc_inst),
+                        "val/nuclei_instance_balanced_accuracy": float(nuc_bal_acc_type),
                         "val/nuclei_geom_tp": geom_tp_total,
                         "val/nuclei_class_pairs": class_pairs_total,
                         "val/nuclei_gt_instances": gt_inst_total,
@@ -395,8 +395,8 @@ class CellViTTrainer(BaseTrainer):
             except Exception:
                 pass  # don't crash training if wandb isn't initialized
 
-        if nuc_bal_acc_inst is not None and nuc_bal_acc_inst > self.best_nuc_bal_acc:
-            self.best_nuc_bal_acc = nuc_bal_acc_inst
+        if nuc_bal_acc_type is not None and nuc_bal_acc_type > self.best_nuc_bal_acc:
+            self.best_nuc_bal_acc = nuc_bal_acc_type
             self.best_nuc_bal_acc_epoch = epoch
             self.logger.info(f"New BEST Nuc-Inst-BalAcc at epoch {epoch}: {self.best_nuc_bal_acc:.4f}")
 
@@ -424,9 +424,9 @@ class CellViTTrainer(BaseTrainer):
             )
 
         extra_bal = (
-            f" - Nuc-Inst-BalAcc.: {nuc_bal_acc_inst:.4f}"
-            if nuc_bal_acc_inst is not None
-            else " - Nuc-Inst-BalAcc.: n/a"
+            f" - Nuc-Inst-BalAcc.: {nuc_bal_acc_type:.4f}"
+            if nuc_bal_acc_type is not None
+            else " - Nuc-Type-BalAcc.: n/a"
         )
 
         self.logger.info(
